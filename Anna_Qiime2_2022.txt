@@ -1,0 +1,417 @@
+***Qiime2_Sally basic***
+Anna Edited
+
+Download latest Qiime2 version from: https://docs.qiime2.org/2018.11/install/native/ For MacOS/OSX (may need to install miniconda first)
+
+#Copy all files into one folder
+find ./ -name '*.fq.gz' -exec cp -prv '{}' '/path/to/targetDir/' ';'
+
+
+#File names:
+All Casava 1.8 paired-end demultiplexed fastq files have to have the following naming:
+L2S357_15_L001_R1_001.fastq.gz and L2S357_15_L001_R2_001.fastq.gz
+
+The underscore-separated fields in this file name are:
+
+the sample identifier,
+
+the barcode sequence or a barcode identifier,
+
+the lane number,
+
+the direction of the read (i.e. R1 or R2), and
+
+the set number.
+
+You can use the following lines if needed:
+
+cd to folder where your files are (fast folder)
+#change file extension to correct fast.gz
+for f in *.fq.gz; do mv -- "$f" "${f%.fq.gz}.fastq.gz"; done
+#add prefix 
+for filename in *.fastq.gz; do mv "$filename" "FT_${filename}"; done;
+
+#add suffix
+Select all, right click, rename...(R1,R2,001)
+
+
+
+
+#In terminal:
+
+source activate qiime2-2021.11
+
+cd to a folder for your sequencing which has a folder in it called fastq which contains all your fastq.gz files.
+
+
+
+
+
+1)**IMPORT FASTQ INTO QIIME**
+
+
+#FOR PAIRED END
+qiime tools import --type 'SampleData[PairedEndSequencesWithQuality]' --input-path fastq --input-format CasavaOneEightSingleLanePerSampleDirFmt --output-path demux-paired-end.qza
+
+#FOR SINGLE END
+qiime tools import --type 'SampleData[SequencesWithQuality]' --input-path R1_fastq --input-format CasavaOneEightSingleLanePerSampleDirFmt --output-path demux-single-end.qza
+
+
+
+
+2)**FIND PRIMERS AND REMOVE** CUTADAPT** 
+
+Primers are 5'-3'. Default error rate is 0.1 (10%) so there can be 2 mismatches in a 20 bp primer. This can be changed by adding --p-error-rate (0.13 for 2 mismatches in 17-22 bp, 0.18 for 3). --p-overlap 10 is the minimum overlap (i.e. the minimum length of adapter to find and remove), I have set this at 10 (default is 3 but too many false matches, you can run without --p-overlap to see where would be a good length to choose based on expected number of counts). Error counts are 'no errors - 1 error - 2 errors' i.e. 1234 123 3. --p-minimum-length 50 means remove any reads under 50 bp. Need --p-adapter-f F primer ... RC of reverse (found in read through of R1 reads) and --p-adapter-r R primer ... RC of forward (found in read through of R2 reads).
+
+
+# Bacteria (515f & 806r)
+
+
+qiime cutadapt trim-paired --i-demultiplexed-sequences demux-paired-end.qza --p-adapter-f '^GTGCCAGCMGCCGCGGTAA...ATTAGAWACCCBDGTAGTCC' --p-adapter-r '^GGACTACHVGGGTWTCTAAT...TTACCGCGGCKGCTGGCAC' --p-cores 2 --o-trimmed-sequences trimmed-seqs.qza  --p-discard-untrimmed --p-overlap 10 --p-minimum-length 50 --verbose --p-error-rate 0.13
+
+# Bacteria v34 (341f & 805r) Ian L
+
+
+qiime cutadapt trim-paired --i-demultiplexed-sequences demux-paired-end.qza --p-adapter-f '^CCTACGGGNGGCWGCAG...GGATTAGATACCCBDGTAGTC' --p-adapter-r '^GACTACHVGGGTATCTAATCC...CTGCWGCCNCCCGTAGG' --p-cores 2 --o-trimmed-sequences trimmed-seqs.qza  --p-discard-untrimmed --p-overlap 10 --p-minimum-length 50 --verbose --p-error-rate 0.18
+
+
+# Fungi (fITS7 & ITS4)
+
+qiime cutadapt trim-paired --i-demultiplexed-sequences demux-paired-end.qza --p-adapter-f '^AACTTTYRRCAAYGGATCWCT...AYTTAAGCATATCAATAAGCGGAGGCT' --p-adapter-r '^AGCCTCCGCTTATTGATATGCTTAART...AGWGATCCRTTGYYRAAAGTT' --p-cores 2 --o-trimmed-sequences trimmed-seqs.qza  --p-discard-untrimmed --p-overlap 10 --p-minimum-length 50 --verbose --p-error-rate 0.18
+
+
+# Fungi ITS2 Novogene (ITS3 & ITS4)
+
+qiime cutadapt trim-paired --i-demultiplexed-sequences demux-paired-end.qza --p-adapter-f 
+'^GCATCGATGAAGAACGCAGC...GCATATCAATAAGCGGAGGA' --p-adapter-r '^TCCTCCGCTTATTGATATGC...CAAAGATTCGATGAYTCAC' --p-cores 2 --o-trimmed-sequences trimmed-seqs.qza  --p-discard-untrimmed --p-overlap 10 --p-minimum-length 50 --verbose --p-
+error-rate 0.18
+
+# Fungi 5.8S - ITS2 Taylor et. al 2022 (5.8S-FUN & ITS4-FUN)
+
+qiime cutadapt trim-paired --i-demultiplexed-sequences demux-paired-end.qza --p-adapter-f '^AGTCAGTCAGGGAACTTTYRRCAAYGGATCWCT...AYTTAAGCATATCAATAAGCGGAGGCT' --p-adapter-r '^TATGGTAATTAAAGCCTCCGCTTATTGATATGCTTAART...AGWGATCCRTTGYYRAAAGTT' --p-cores 2 --o-trimmed-sequences trimmed-seqs.qza  --p-discard-untrimmed --p-overlap 10 --p-minimum-length 50 --verbose --p-error-rate 0.18
+
+#AM (AMV4.5 & AMDGR)
+
+#Here the two 3' nt of the forward primer have been exchanged for NN as known 2 mismatches a 3' end to endogonales.
+
+qiime cutadapt trim-paired --i-demultiplexed-sequences demux-paired-end.qza --p-adapter-f '^CAAGCAGAAGACGGCATACGAGAT...ACTTTYRRCAAYGGATCWCTG' --p-adapter-r
+'^AATGATACGGCGACCACCGAGATC...AGCCTCCGCTTATTGATATGCTTAART' --p-cores 2 --o-trimmed-sequences trimmed-seqs.qza  --p-discard-untrimmed --p-overlap 10 --p-minimum-length 50 --verbose --p-error-rate 0.18 
+
+#AM NEW (AM-Sal-F AMV4.5-Trun) & AMDGR)
+
+qiime cutadapt trim-paired --i-demultiplexed-sequences demux-paired-end.qza --p-adapter-f '^AAGCTCGTAGTTGAATTT...ATGATTAATAGGGATAGTTGGG' --p-adapter-r '^CCCAACTATCCCTATTAATCAT...AAATTCAACTACGAGCTT' --p-cores 2 --o-trimmed-sequences trimmed-seqs.qza  --p-discard-untrimmed --p-overlap 10 --p-minimum-length 50 --verbose --p-error-rate 0.18 
+
+
+#FRE (Mucoro F & R)
+
+qiime cutadapt trim-paired --i-demultiplexed-sequences demux-paired-end.qza --p-adapter-f '^GTTGAATTTTAGCCYTGGC...WGAGAAATCAAAGTTTTTGGG' --p-adapter-r '^CCCAAAAACTTTGATTTCTCW...GCCARGGCTAAAATTCAAC' --p-cores 2 --o-trimmed-sequences trimmed-seqs.qza  --p-discard-untrimmed --p-overlap 10 --p-minimum-length 50 --verbose --p-error-rate 0.18
+
+
+(FOR SINGLE END 
+
+
+qiime cutadapt trim-single --i-demultiplexed-sequences demux-single-end.qza --p-front ^CCTACGGGNGGCWGCAG --p-cores 2 --o-trimmed-sequences trimmed-seqs.qza  --p-discard-untrimmed --p-overlap 10 --p-minimum-length 50 --verbose --p-error-rate 0.18
+
+)
+
+
+# Make into a visualisation (.qzv)
+
+qiime demux summarize --i-data trimmed-seqs.qza --o-visualization trimmed-seqs.qzv
+
+
+# Drag .qzv file into https://view.qiime2.org/ to look at overview and Interactive quality Plot. The read counts can be downloaded as a .csv file.
+
+#OR in terminal (does not work if on server - need to copy to Mac and use website)
+
+qiime tools view trimmed-seqs.qzv
+
+
+#For all amplicons except ITS - Choose a cutoff length based on the quality, the length of your reads and your overlap. This cutoff will trim any sequences to that length and remove any that are under that length. In the Interactive quality Plot move the cursor along the nt until in the table below the median = 30 (Q score based on moving picture tutorial which actually used 28), alternatively use a ruler to see where Q15 touches the lower whisker and check this position, it should be similar). Note this nt position down for Forward and Reverse. Then look at the 'Demultiplexed sequence length summary' below to see how many sequences would be lost if you cut at that nt. I.e. if you cut at x nt you would lose 2 % of your reads. If too many then reduce to around the 2% position or lower if you know you can get at least 20 nt overlap between R1 and R2 (20 nt longer than the amplicon without primers). For Bacteria 515f & 806r make sure you choose a trim length under 252 for each, as this is the size of the amplicon! Likewise for AM choose a length under 216 bp (200 for both reads works well). For longer amplicons i.e. FRE amplicon, the length of the amplicon without primers is 441 so need at least 461 (441+20) total (470 to be safe).
+
+ITS-Fungi - unlike 16S and 18S, we will not be truncating the reads to a fixed length, as the ITS region has significant biological length variation that is lost by such an approach. i.e. for fITS4+ITS7 the amplicon is around 200-400 after primers have been trimmed. If we truncate to 200 we lose any amplicons that might have been <200. If we truncate at 200 then there is not enough overlap for amplicons over 400 (would need 420). So instead use --p-trunc-q 10, Reads are truncated at the first instance of a quality score less than or equal to this value. Q 5 is too low as the default fast maxee is 2 and there will still be too many errors in the read and it will be discarded. Q 15 leaves slightly less reads filtered than q 10, not sure why. --p-trunc-q is run first to trim off any poor ends, then the default fast maxee 2 removes any further low quality reads. Without --p-trunc-q a lot of reads are discarded due to poor quality. About 80% reads merge with --p-trunc-q 10.
+
+
+(SINGLE END
+As above but only forward read looked at).
+
+
+3)**DADA2 DENOISING AND MERGING PAIRED ENDS** 
+
+This can take several hours - best done on a server.
+
+
+DADA2 This trims according to the quality file and the cutoff values you have chosen above. It the uses the DADA denoising pipeline to correct Illumina sequence data, including filtering chimeric sequences. It then joins F and R. --verbose allows you to see how it is running.--p-n-threads The number of threads to use for multithreaded processing. If 0 is provided, all available cores will be used [default:1].
+
+For 16S or 18S, replace the N in --p-trunc-len-f N and --p-trunc-len-r N with these nt positions chosen as cutoff values.  For AM 200 for each works well. For FRE 260 F and 230 R (but check). Bacteria 220 F and 200 R (but check).
+
+
+**Use nohup if using a server**
+
+nohup qiime dada2 denoise-paired --i-demultiplexed-seqs trimmed-seqs.qza --p-trunc-len-f N --p-trunc-len-r N --p-trim-left-f 0 --p-trim-left-r 0 --o-representative-sequences rep-seqs-dada2.qza --o-table table-dada2.qza --o-denoising-stats stats-dada2.qza --verbose --p-n-threads 0
+
+
+ITS-Fungi - Cannot trim the reads so use pp-trun-q 10. 
+
+nohup qiime dada2 denoise-paired --i-demultiplexed-seqs trimmed-seqs.qza --p-trunc-len-f 0 --p-trunc-len-r 0 --o-representative-sequences rep-seqs-dada2.qza --o-table table-dada2.qza --o-denoising-stats stats-dada2.qza --verbose --p-n-threads 0 --p-trunc-q 10
+
+(Single end
+qiime dada2 denoise-single --i-demultiplexed-seqs trimmed-seqs.qza --p-trunc-len 250 --o-representative-sequences rep-seqs-dada2.qza --o-table table-dada2.qza --o-denoising-stats stats-dada2.qza --verbose --p-n-threads 0
+)
+
+
+Output artifacts:
+
+stats-dada2.qza
+table-dada2.qza
+rep-seqs-dada2.qza
+
+
+# View the outputs. Turn them into .qzv as below. table-dada2.qzv gives an overview and Interactive Sample Detail where you can see where to rarefy (Sample depth) and how many sequences and samples will be retained using a sliding bar. rep-seqs-dada2.qzg gives a fasta file of the OTUs. Stats-dada2.qzv gives the number of reads started with, filtered, denoised, merged and non-chimeric.
+
+
+#Tabulate the stats to visualise and download .tsv and .fasta if needed.
+
+
+qiime metadata tabulate --m-input-file stats-dada2.qza --o-visualization stats-dada2.qzv
+
+qiime tools view stats-dada2.qzv
+
+
+
+#See an overview of samples and where to rarefy if required.
+
+qiime feature-table summarize --i-table table-dada2.qza --o-visualization table-dada2.qzv 
+
+qiime tools view table-dada2.qzv
+
+
+
+#This gives a fasta file of all sequences, but this can be downloaded later.
+
+qiime feature-table tabulate-seqs --i-data rep-seqs-dada2.qza --o-visualization rep-seqs-dada2.qzv
+
+qiime tools view rep-seqs-dada2.qzv
+
+
+
+
+
+
+
+4)**REMOVE SINGLETONS**
+
+DADA2 should remove singletons but rare ones might arise during processing. These can be removed as following:
+
+qiime feature-table filter-features --i-table table-dada2.qza --p-min-frequency 2 --o-filtered-table table-dada2-no-s.qza
+
+
+
+#Sanity check to see that the minimum frequency is now 2 in 'Frequency per feature'
+
+
+qiime feature-table summarize --i-table table-DADA2-no-s.qza --o-visualization table-dada2-no-s.qzv
+
+qiime tools view table-dada2-no-s.qzv
+
+
+
+
+
+
+5)**ASSIGN TAXONOMY** 
+
+This can take around an hour. There are 2 methods for classification of bacterial 16S rRNA and fungal ITS marker-gene amplicon sequence data you can use in Qiime2, a scikit-learn naive Bayes machine-learning classifier (fit-classifier-naive-bayes) and an alignment-based taxonomy consensus methods based on VSEARCH, and BLAST+. The classifier file incorporates fasta and taxonomy.
+
+This gives the OTUs a taxonomy but do not make an OTU table yet. It gives a consensus (confidence?) score out of 1.
+
+If using a server, remove paths and make sure taxonomy files are in your folder.
+
+
+#Bacteria (515-806 primers) (greengenes or SILVA, could try both and compare). If not 515-806 primers then use other q2 files.
+
+#Greengenes
+
+qiime feature-classifier classify-sklearn --i-classifier /Users/lfslal/Desktop/Essential_Qiime_files_share2/Qiime2_files/q2_assign_database_files/16S/gg-13-8-99-515-806-nb-classifier.qza --i-reads rep-seqs-dada2.qza --o-classification taxonomy.qza
+
+
+#SILVA 132
+
+qiime feature-classifier classify-sklearn --i-classifier /Users/lfslal/Desktop/Essential_Qiime_files_share2/Qiime2_files/q2_assign_database_files/16S/silva-132-99-515-806-nb-classifier.qza --i-reads rep-seqs-dada2.qza --o-classification taxonomy.qza
+
+#SILVA 138 (have not tested this yet)
+
+qiime feature-classifier classify-sklearn --i-classifier /Users/lfslal/Desktop/Essential_Qiime_files_share2/Qiime2_files/q2_assign_database_files/16S/Silva_138/silva-138-99-515-806-nb-classifier.qza --i-reads rep-seqs-dada2.qza --o-classification taxonomy.qza
+
+
+#Fungi-UNITE v8
+
+Make sure the developer version of the latest unite database is used. I have used dynamic which is manually curated from 97-99. Could use 99, very similar results.
+
+#This U8 sklearn version uses the dynamic Unite v8 release from the all Euk which includes plants. This means plants seem to be identified correctly. Some taxonomy has lots of unidentified which may need removing before putting in R. I compared this to extracting the ITS7-4 region and this seemed better (using the whole ITS region).
+
+#2022 new version UNITE_classifier_ver9_27.10.2022.gza
+
+qiime feature-classifier classify-sklearn --i-classifier /Users/u2061312/Documents/UNITE_classifier_ver9_27.10.2022.qza --o-classification taxonomy.qza --p-read-orientation same --i-reads rep-seqs-dada2.qza
+
+
+
+#18S SILVA 132- (need to retrain classifier for SILVA 138)
+
+qiime feature-classifier classify-consensus-blast --i-reference-reads /Users/lfslal/Desktop/Essential_Qiime_files_share2/Qiime2_files/q2_assign_database_files/18S_silva_132_99/silva_132_99_18S_fna.qza --i-reference-taxonomy /Users/lfslal/Desktop/Essential_Qiime_files_share2/Qiime2_files/q2_assign_database_files/18S_silva_132_99/silva_132_99_taxonomy_all_levels_ref-taxonomy.qza  --i-query  rep-seqs-dada2.qza  --o-classification taxonomy.qza
+
+
+
+#Look at the confidence values for taxonomy.
+
+qiime metadata tabulate --m-input-file taxonomy.qza --o-visualization taxonomy.qzv
+
+qiime tools view taxonomy.qzv
+
+Download the above as a .tsv
+
+
+
+
+6)**REMOVING MITOCHONDRIA AND CHLOROPLASTS FROM 16S TABLES** (Ignore if not 16S).
+
+
+qiime taxa filter-table --i-table table-dada2-no-s.qza --i-taxonomy taxonomy.qza --p-exclude mitochondria,chloroplast --o-filtered-table table-no-mit-no-chlor.qza
+
+
+
+
+
+6)***MAKE AN OTU TABLE*** 
+
+
+#This is useful for using in different software (R, PAST, Primer6).
+
+
+#First do below to export the feature table - this will be an output called feature-table.biom in the folder exported-table-dada. Remember for 16S to use table with mit and chlor.  If using clustering after dada2 use cluster-table-dn-97.qza.
+
+qiime tools export --input-path table-dada2-no-s.qza --output-path exported-table-dada
+
+#FOR 16S
+qiime tools export --input-path table-no-mit-no-chlor.qza --output-path exported-table-dada
+
+
+#Next export the taxonomy. This will output a taxonomy.tsv file in exported-taxonomy folder
+
+qiime tools export --input-path taxonomy.qza --output-path exported-taxonomy
+
+
+Open the taxonomy.tsv in the exported-taxonomy folder in text edit and the over FeatureID to read #OTU ID and type over Taxon to read taxonomy. Save changes.
+
+
+#Make a biom file
+
+biom add-metadata -i exported-table-dada/feature-table.biom -o otu_table.biom  --observation-metadata-fp exported-taxonomy/taxonomy.tsv 
+
+
+#convert biom to text file.
+
+biom convert --to-tsv --table-type="OTU table" --header-key taxonomy -i otu_table.biom -o otu_table.txt
+
+Open txt file in excel and save as a excel file. This can now be used as an OTU table in other programs.
+
+
+
+
+7)**EXTRACT fasta sequences**
+
+Do this to get the fasta 'otus.fa' qiime1 equivalent. It will go to a path like this. /extracted_rep-seqs-dada2/c8d11213-30dd-408d-b5bc-feb819ccd4bd/data/dna-sequences.fasta. 
+
+
+qiime tools extract --input-path rep-seqs-dada2.qza --output-path extracted_rep-seqs-dada2
+
+
+
+
+
+
+8) ***OPTIONAL*** **Cluster ASVs at 97% (around species level) to be more like traditional OTUs (or other %)**
+
+
+
+**Can use the output of Dada2 to cluster at 97% if required by using table-dada2.qza and rep-seqs-dada2.qza. (No need to remove singletons or do chimera check if clustering dada2 ASVs as these will already have been done.)
+
+qiime vsearch cluster-features-de-novo --i-table table-dada2.qza --i-sequences rep-seqs-dada2.qza --p-perc-identity 0.97 --o-clustered-table cluster-table-dn-97.qza --o-clustered-sequences cluster-rep-seqs-dn-97.qza
+
+
+
+Output artifacts:
+
+cluster-table-dn-97.qza
+cluster-rep-seqs-dn-97.qza
+
+These should be otu table and otus.fa equivalent.
+
+
+
+
+Then ***MAKE AN OTU TABLE***  
+
+
+qiime tools export --input-path cluster-table-dn-97.qza --output-path exported-cluster-table-dn-97
+
+
+#Make a biom file which includes taxonomy
+
+biom add-metadata -i exported-cluster-table-dn-97/feature-table.biom -o otu_table_97.biom  --observation-metadata-fp exported-taxonomy/taxonomy.tsv 
+
+
+#convert biom to text file.
+
+biom convert --to-tsv --table-type="OTU table" --header-key taxonomy -i otu_table_97.biom -o otu_table_97.txt
+
+Open txt file in excel and save as a excel file. This can now be used as an OTU table in other programs.
+
+
+
+**EXTRACT fasta sequences** (May not need to do this as all the OTUs will be in the original fasta file).
+
+Do this to get the fasta 'otus.fa' qiime1 equivalent. It will go to a path like this. /extracted_rep-seqs-dada2/c8d11213-30dd-408d-b5bc-feb819ccd4bd/data/dna-sequences.fasta. 
+
+
+qiime tools extract --input-path cluster-rep-seqs-dn-97.qza --output-path extracted_cluster-rep-seqs-dn-97
+
+
+
+
+
+***EXTRA***
+
+10) Importing already constructed OTU tables into qiime2. 
+
+cd to a folder containing your OTU table and .fasta file.
+
+For L7 tables you may need to make into a .txt then remove the taxonomy column at the end and make back into a .biom.
+
+
+biom convert --table-type="OTU table" --to-hdf5 -i otu_table.txt -o otu_table.biom 
+
+
+#Import a biom
+qiime tools import --input-path otu_table.biom  --type 'FeatureTable[Frequency]'  --input-format BIOMV210Format --output-path otu_table.qza
+
+
+
+#Import a fasta
+qiime tools import  --input-path otus.fa   --output-path sequences_ITS.qza --type 'FeatureData[Sequence]' 
+
+
+#If lowercase error when importing fasta then change lowercase to uppercase using:
+
+tr 'acgt' 'ACGT' < otus.fa > otus_Up.fa
+
+Make sure these letters aren't in your file names though.
+
+
+
+#Taxonomy
+You can make a taxonomy file by copying the OTU number column (#OTU ID) and the taxonomy column to a new text file. Column headings #OTU ID and taxonomy. Replace spaces with nothing in find and replace in the taxonomy column. If you get error ''utf-8' codec can't decode byte 0x91 in position 91: invalid start byte' then they may be non asci characters in your taxonomy such as ë which you need to find and replace (option + u, release then e).
+
+qiime tools import  --input-path taxonomy.txt   --output-path taxonomy.qza --type 'FeatureData[Taxonomy]' --input-format HeaderlessTSVTaxonomyFormat
+
+
